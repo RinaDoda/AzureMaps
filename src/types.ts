@@ -14,15 +14,11 @@ export interface StoryData {
   bestUploadTime: string;
 }
 
+export type ClipStatus = 'pending' | 'submitting' | 'generating' | 'downloading' | 'done' | 'error';
+
 export type AppStage =
   | 'form'
   | 'generating-script'
-  | 'generating-voiceover'
-  | 'ready-for-clips'
+  | 'generating-assets'
   | 'assembling'
   | 'complete';
-
-export interface AssemblyResult {
-  videoURL: string;
-  thumbnailURL: string;
-}

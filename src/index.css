@@ -1203,3 +1203,47 @@ body {
   .section-nav { top: 8px; padding: 12px 14px; }
   .download-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Kling progress grid ── */
+.kling-progress-body { padding-top: 16px; }
+
+.kling-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.kling-clip-card {
+  background: var(--surface);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+  overflow: hidden;
+}
+
+.kling-clip-card.clip-active { border-color: var(--border); }
+.kling-clip-card.clip-done { border-color: rgba(52,211,153,0.3); background: rgba(52,211,153,0.04); }
+.kling-clip-card.clip-error { border-color: rgba(248,113,113,0.3); }
+
+.kling-clip-num { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--gold); }
+.kling-clip-status { font-size: 0.82rem; color: var(--text-muted); }
+.kling-clip-card.clip-done .kling-clip-status { color: var(--success); }
+.kling-clip-card.clip-error .kling-clip-status { color: var(--error); }
+
+.kling-pulse {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(244,185,66,0.06), transparent);
+  animation: klingPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes klingPulse {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@media (max-width: 600px) { .kling-grid { grid-template-columns: repeat(2, 1fr); } }
