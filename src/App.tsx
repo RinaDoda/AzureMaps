@@ -1,13 +1,10 @@
 import { useState } from 'react';
-import type { StoryData, AppStage, ClipStatus } from './types';
+import type { StoryData, AppStage } from './types';
 import { generateStoryData } from './generate';
 import { generateVoiceover } from './elevenlabs';
-import { submitKlingVideo, pollKlingVideo, fetchVideoBlob } from './kling';
-import { assembleVideo } from './ffmpeg-assembly';
-import { generateThumbnail } from './thumbnail';
 import StoryForm from './components/StoryForm';
 import SceneCards from './components/SceneCards';
-import KlingProgress from './components/KlingProgress';
+import VideoAssembly from './components/VideoAssembly';
 import DownloadSection from './components/DownloadSection';
 
 const STARS = Array.from({ length: 80 }, (_, i) => ({
@@ -23,94 +20,80 @@ const STARS = Array.from({ length: 80 }, (_, i) => ({
 export default function App() {
   const [anthropicKey, setAnthropicKey] = useState(() => sessionStorage.getItem('anthropic_key') ?? '');
   const [elevenLabsKey, setElevenLabsKey] = useState(() => sessionStorage.getItem('elevenlabs_key') ?? '');
-  const [klingAccessKey, setKlingAccessKey] = useState(() => sessionStorage.getItem('kling_access') ?? '');
-  const [klingSecretKey, setKlingSecretKey] = useState(() => sessionStorage.getItem('kling_secret') ?? '');
   const [storyTitle, setStoryTitle] = useState('');
   const [characters, setCharacters] = useState('');
-  const [backgroundMusic, setBackgroundMusic] = useState<File | null>(null);
   const [stage, setStage] = useState<AppStage>('form');
   const [progress, setProgress] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [storyData, setStoryData] = useState<StoryData | null>(null);
+  const [voiceoverBlob, setVoiceoverBlob] = useState<Blob | null>(null);
   const [voiceoverURL, setVoiceoverURL] = useState<string | null>(null);
-  const [voiceoverDone, setVoiceoverDone] = useState(false);
-  const [clipStatuses, setClipStatuses] = useState<ClipStatus[]>(Array(6).fill('pending'));
+  const [voiceoverGenerating, setVoiceoverGenerating] = useState(false);
   const [videoURL, setVideoURL] = useState<string | null>(null);
   const [thumbnailURL, setThumbnailURL] = useState<string | null>(null);
   const [submittedTitle, setSubmittedTitle] = useState('');
 
-  const makeKeySetter = (setter: (v: string) => void, storageKey: string) => (v: string) => {
-    setter(v); sessionStorage.setItem(storageKey, v);
-  };
-
-  const setClipStatus = (i: number, s: ClipStatus) =>
-    setClipStatuses((prev) => { const next = [...prev]; next[i] = s; return next; });
+  const handleAnthropicKey = (k: string) => { setAnthropicKey(k); sessionStorage.setItem('anthropic_key', k); };
+  const handleElevenLabsKey = (k: string) => { setElevenLabsKey(k); sessionStorage.setItem('elevenlabs_key', k); };
 
   const handleGenerate = async () => {
+    if (!anthropicKey.trim() || !elevenLabsKey.trim() || !storyTitle.trim() || !characters.trim()) return;
     setError(null);
     setStoryData(null);
+    setVoiceoverBlob(null);
     setVoiceoverURL(null);
-    setVoiceoverDone(false);
     setVideoURL(null);
     setThumbnailURL(null);
-    setClipStatuses(Array(6).fill('pending'));
     setSubmittedTitle(storyTitle);
     setStage('generating-script');
-    setProgress('✍️ Writing your bedtime story with Claude...');
 
     try {
       const data = await generateStoryData(anthropicKey, storyTitle, characters, setProgress);
       setStoryData(data);
-      setStage('generating-assets');
+      setStage('generating-voiceover');
+      setVoiceoverGenerating(true);
+      setProgress('🎙️ Sending to ElevenLabs Bella...');
 
-      const voiceoverPromise = generateVoiceover(elevenLabsKey, data.fullNarration).then((blob) => {
-        setVoiceoverURL(URL.createObjectURL(blob));
-        setVoiceoverDone(true);
-        return blob;
-      });
-
-      const clipPromises = data.scenes.map(async (scene, i) => {
-        setClipStatus(i, 'submitting');
-        const taskId = await submitKlingVideo(klingAccessKey, klingSecretKey, scene.klingPrompt);
-        setClipStatus(i, 'generating');
-        const videoUrl = await pollKlingVideo(klingAccessKey, klingSecretKey, taskId);
-        setClipStatus(i, 'downloading');
-        const blob = await fetchVideoBlob(videoUrl);
-        setClipStatus(i, 'done');
-        return blob;
-      });
-
-      const [voiceoverBlob, ...clipBlobs] = await Promise.all([voiceoverPromise, ...clipPromises]);
-
-      setStage('assembling');
-      setProgress('⚙️ Loading FFmpeg and assembling your video...');
-
-      const clipFiles = clipBlobs.map((b, i) =>
-        new File([b], `clip${i + 1}.mp4`, { type: 'video/mp4' }),
-      );
-
-      const finalBlob = await assembleVideo(clipFiles, voiceoverBlob, backgroundMusic, setProgress);
-      setVideoURL(URL.createObjectURL(finalBlob));
-      setThumbnailURL(generateThumbnail(storyTitle));
-      setStage('complete');
+      const blob = await generateVoiceover(elevenLabsKey, data.fullNarration, setProgress);
+      const url = URL.createObjectURL(blob);
+      setVoiceoverBlob(blob);
+      setVoiceoverURL(url);
+      setVoiceoverGenerating(false);
+      setStage('ready-for-clips');
+      setProgress('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'An unexpected error occurred.');
       setStage('form');
+      setVoiceoverGenerating(false);
       setProgress('');
     }
   };
 
-  const isLoading = stage !== 'form' && stage !== 'complete';
+  const handleAssemblyComplete = (vid: string, thumb: string) => {
+    setVideoURL(vid);
+    setThumbnailURL(thumb);
+    setStage('complete');
+  };
+
+  const isLoading = stage === 'generating-script' || stage === 'generating-voiceover';
 
   return (
     <>
       <div className="star-field" aria-hidden="true">
         {STARS.map((s) => (
-          <div key={s.id} className="star" style={{
-            top: `${s.top}%`, left: `${s.left}%`,
-            width: `${s.size}px`, height: `${s.size}px`,
-            '--op': s.opacity, '--dur': `${s.dur}s`, '--delay': `${s.delay}s`,
-          } as React.CSSProperties} />
+          <div
+            key={s.id}
+            className="star"
+            style={{
+              top: `${s.top}%`,
+              left: `${s.left}%`,
+              width: `${s.size}px`,
+              height: `${s.size}px`,
+              '--op': s.opacity,
+              '--dur': `${s.dur}s`,
+              '--delay': `${s.delay}s`,
+            } as React.CSSProperties}
+          />
         ))}
       </div>
 
@@ -118,43 +101,34 @@ export default function App() {
         <header className="app-header">
           <span className="header-moon">🌙</span>
           <h1>Bedtime Story Video Generator</h1>
-          <p>Script · Voiceover · Kling Videos · Assembly · Thumbnail — fully automated</p>
+          <p>Script · Voiceover · Video Assembly · Thumbnail · YouTube — fully automated</p>
         </header>
 
         <StoryForm
           anthropicKey={anthropicKey}
           elevenLabsKey={elevenLabsKey}
-          klingAccessKey={klingAccessKey}
-          klingSecretKey={klingSecretKey}
           storyTitle={storyTitle}
           characters={characters}
-          backgroundMusic={backgroundMusic}
           loading={isLoading}
-          onAnthropicKeyChange={makeKeySetter(setAnthropicKey, 'anthropic_key')}
-          onElevenLabsKeyChange={makeKeySetter(setElevenLabsKey, 'elevenlabs_key')}
-          onKlingAccessKeyChange={makeKeySetter(setKlingAccessKey, 'kling_access')}
-          onKlingSecretKeyChange={makeKeySetter(setKlingSecretKey, 'kling_secret')}
+          onAnthropicKeyChange={handleAnthropicKey}
+          onElevenLabsKeyChange={handleElevenLabsKey}
           onTitleChange={setStoryTitle}
           onCharactersChange={setCharacters}
-          onMusicChange={setBackgroundMusic}
           onGenerate={handleGenerate}
         />
 
-        {stage === 'generating-script' && (
+        {isLoading && (
           <div className="card loading-card">
-            <div className="loading-moon-wrap"><div className="loading-moon">🌙</div></div>
+            <div className="loading-moon-wrap">
+              <div className="loading-moon">🌙</div>
+            </div>
             <div className="loading-dots"><span /><span /><span /></div>
             <p className="loading-message">{progress}</p>
-            <p className="loading-subtitle">Claude is writing your 6-scene story — ~30s</p>
-          </div>
-        )}
-
-        {stage === 'assembling' && (
-          <div className="card loading-card">
-            <div className="loading-moon-wrap"><div className="loading-moon">🎬</div></div>
-            <div className="loading-dots"><span /><span /><span /></div>
-            <p className="loading-message">{progress}</p>
-            <p className="loading-subtitle">FFmpeg assembling your 1080p video in the browser — keep this tab open</p>
+            <p className="loading-subtitle">
+              {stage === 'generating-script'
+                ? 'Claude is writing your 6-scene bedtime story — ~30s'
+                : 'ElevenLabs Bella is recording your voiceover — ~20s'}
+            </p>
           </div>
         )}
 
@@ -165,24 +139,34 @@ export default function App() {
           </div>
         )}
 
-        {storyData && stage === 'generating-assets' && (
-          <KlingProgress statuses={clipStatuses} voiceoverDone={voiceoverDone} />
-        )}
+        {storyData && !isLoading && (
+          <>
+            <SceneCards
+              scenes={storyData.scenes}
+              voiceoverURL={voiceoverURL}
+              voiceoverGenerating={voiceoverGenerating}
+              youtubeTitle={storyData.youtubeTitle}
+              youtubeDescription={storyData.youtubeDescription}
+              youtubeTags={storyData.youtubeTags}
+              bestUploadTime={storyData.bestUploadTime}
+            />
 
-        {storyData && (stage === 'complete' || stage === 'assembling') && (
-          <SceneCards
-            scenes={storyData.scenes}
-            voiceoverURL={voiceoverURL}
-            voiceoverGenerating={false}
-            youtubeTitle={storyData.youtubeTitle}
-            youtubeDescription={storyData.youtubeDescription}
-            youtubeTags={storyData.youtubeTags}
-            bestUploadTime={storyData.bestUploadTime}
-          />
-        )}
+            {(stage === 'ready-for-clips' || stage === 'assembling' || stage === 'complete') && (
+              <VideoAssembly
+                voiceoverBlob={voiceoverBlob}
+                storyTitle={submittedTitle}
+                onComplete={handleAssemblyComplete}
+              />
+            )}
 
-        {stage === 'complete' && videoURL && thumbnailURL && (
-          <DownloadSection videoURL={videoURL} thumbnailURL={thumbnailURL} storyTitle={submittedTitle} />
+            {stage === 'complete' && videoURL && thumbnailURL && (
+              <DownloadSection
+                videoURL={videoURL}
+                thumbnailURL={thumbnailURL}
+                storyTitle={submittedTitle}
+              />
+            )}
+          </>
         )}
       </div>
     </>
