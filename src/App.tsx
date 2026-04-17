@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import type { StoryPackage } from './types';
-import { generateStoryPackage } from './generate';
+import type { StoryData, AppStage } from './types';
+import { generateStoryData } from './generate';
+import { generateVoiceover } from './elevenlabs';
 import StoryForm from './components/StoryForm';
-import ResultsDisplay from './components/ResultsDisplay';
+import SceneCards from './components/SceneCards';
+import VideoAssembly from './components/VideoAssembly';
+import DownloadSection from './components/DownloadSection';
 
-// Generate a static star field (deterministic to avoid re-renders)
 const STARS = Array.from({ length: 80 }, (_, i) => ({
   id: i,
   top: ((i * 137.5) % 100).toFixed(2),
@@ -16,41 +18,67 @@ const STARS = Array.from({ length: 80 }, (_, i) => ({
 }));
 
 export default function App() {
-  const [apiKey, setApiKey] = useState(() => sessionStorage.getItem('anthropic_key') ?? '');
+  const [anthropicKey, setAnthropicKey] = useState(() => sessionStorage.getItem('anthropic_key') ?? '');
+  const [elevenLabsKey, setElevenLabsKey] = useState(() => sessionStorage.getItem('elevenlabs_key') ?? '');
   const [storyTitle, setStoryTitle] = useState('');
   const [characters, setCharacters] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [stage, setStage] = useState<AppStage>('form');
   const [progress, setProgress] = useState('');
-  const [result, setResult] = useState<StoryPackage | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [storyData, setStoryData] = useState<StoryData | null>(null);
+  const [voiceoverBlob, setVoiceoverBlob] = useState<Blob | null>(null);
+  const [voiceoverURL, setVoiceoverURL] = useState<string | null>(null);
+  const [voiceoverGenerating, setVoiceoverGenerating] = useState(false);
+  const [videoURL, setVideoURL] = useState<string | null>(null);
+  const [thumbnailURL, setThumbnailURL] = useState<string | null>(null);
   const [submittedTitle, setSubmittedTitle] = useState('');
 
-  const handleApiKeyChange = (key: string) => {
-    setApiKey(key);
-    sessionStorage.setItem('anthropic_key', key);
-  };
+  const handleAnthropicKey = (k: string) => { setAnthropicKey(k); sessionStorage.setItem('anthropic_key', k); };
+  const handleElevenLabsKey = (k: string) => { setElevenLabsKey(k); sessionStorage.setItem('elevenlabs_key', k); };
 
   const handleGenerate = async () => {
-    if (!apiKey.trim() || !storyTitle.trim() || !characters.trim()) return;
-    setLoading(true);
+    if (!anthropicKey.trim() || !elevenLabsKey.trim() || !storyTitle.trim() || !characters.trim()) return;
     setError(null);
-    setResult(null);
+    setStoryData(null);
+    setVoiceoverBlob(null);
+    setVoiceoverURL(null);
+    setVideoURL(null);
+    setThumbnailURL(null);
     setSubmittedTitle(storyTitle);
+    setStage('generating-script');
 
     try {
-      const pkg = await generateStoryPackage(apiKey, storyTitle, characters, setProgress);
-      setResult(pkg);
+      const data = await generateStoryData(anthropicKey, storyTitle, characters, setProgress);
+      setStoryData(data);
+      setStage('generating-voiceover');
+      setVoiceoverGenerating(true);
+      setProgress('🎙️ Sending to ElevenLabs Bella...');
+
+      const blob = await generateVoiceover(elevenLabsKey, data.fullNarration, setProgress);
+      const url = URL.createObjectURL(blob);
+      setVoiceoverBlob(blob);
+      setVoiceoverURL(url);
+      setVoiceoverGenerating(false);
+      setStage('ready-for-clips');
+      setProgress('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'An unexpected error occurred. Please try again.');
-    } finally {
-      setLoading(false);
+      setError(e instanceof Error ? e.message : 'An unexpected error occurred.');
+      setStage('form');
+      setVoiceoverGenerating(false);
       setProgress('');
     }
   };
 
+  const handleAssemblyComplete = (vid: string, thumb: string) => {
+    setVideoURL(vid);
+    setThumbnailURL(thumb);
+    setStage('complete');
+  };
+
+  const isLoading = stage === 'generating-script' || stage === 'generating-voiceover';
+
   return (
     <>
-      {/* Star field background */}
       <div className="star-field" aria-hidden="true">
         {STARS.map((s) => (
           <div
@@ -70,52 +98,75 @@ export default function App() {
       </div>
 
       <div className="app-wrapper">
-        {/* Header */}
         <header className="app-header">
           <span className="header-moon">🌙</span>
           <h1>Bedtime Story Video Generator</h1>
-          <p>Complete YouTube video packages for toddlers — powered by Claude AI</p>
+          <p>Script · Voiceover · Video Assembly · Thumbnail · YouTube — fully automated</p>
         </header>
 
-        {/* Input form */}
         <StoryForm
-          apiKey={apiKey}
+          anthropicKey={anthropicKey}
+          elevenLabsKey={elevenLabsKey}
           storyTitle={storyTitle}
           characters={characters}
-          loading={loading}
-          onApiKeyChange={handleApiKeyChange}
+          loading={isLoading}
+          onAnthropicKeyChange={handleAnthropicKey}
+          onElevenLabsKeyChange={handleElevenLabsKey}
           onTitleChange={setStoryTitle}
           onCharactersChange={setCharacters}
           onGenerate={handleGenerate}
         />
 
-        {/* Loading state */}
-        {loading && (
+        {isLoading && (
           <div className="card loading-card">
             <div className="loading-moon-wrap">
               <div className="loading-moon">🌙</div>
             </div>
-            <div className="loading-dots">
-              <span /><span /><span />
-            </div>
+            <div className="loading-dots"><span /><span /><span /></div>
             <p className="loading-message">{progress}</p>
             <p className="loading-subtitle">
-              Claude is crafting a complete production package — this takes about 30–60 seconds
+              {stage === 'generating-script'
+                ? 'Claude is writing your 6-scene bedtime story — ~30s'
+                : 'ElevenLabs Bella is recording your voiceover — ~20s'}
             </p>
           </div>
         )}
 
-        {/* Error */}
-        {error && !loading && (
+        {error && (
           <div className="card error-card">
             <h3>Generation failed</h3>
             <p>{error}</p>
           </div>
         )}
 
-        {/* Results */}
-        {result && !loading && (
-          <ResultsDisplay result={result} storyTitle={submittedTitle} />
+        {storyData && !isLoading && (
+          <>
+            <SceneCards
+              scenes={storyData.scenes}
+              voiceoverURL={voiceoverURL}
+              voiceoverGenerating={voiceoverGenerating}
+              youtubeTitle={storyData.youtubeTitle}
+              youtubeDescription={storyData.youtubeDescription}
+              youtubeTags={storyData.youtubeTags}
+              bestUploadTime={storyData.bestUploadTime}
+            />
+
+            {(stage === 'ready-for-clips' || stage === 'assembling' || stage === 'complete') && (
+              <VideoAssembly
+                voiceoverBlob={voiceoverBlob}
+                storyTitle={submittedTitle}
+                onComplete={handleAssemblyComplete}
+              />
+            )}
+
+            {stage === 'complete' && videoURL && thumbnailURL && (
+              <DownloadSection
+                videoURL={videoURL}
+                thumbnailURL={thumbnailURL}
+                storyTitle={submittedTitle}
+              />
+            )}
+          </>
         )}
       </div>
     </>

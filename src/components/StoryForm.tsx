@@ -1,53 +1,70 @@
 import { useState } from 'react';
 
 interface Props {
-  apiKey: string;
+  anthropicKey: string;
+  elevenLabsKey: string;
   storyTitle: string;
   characters: string;
   loading: boolean;
-  onApiKeyChange: (v: string) => void;
+  onAnthropicKeyChange: (v: string) => void;
+  onElevenLabsKeyChange: (v: string) => void;
   onTitleChange: (v: string) => void;
   onCharactersChange: (v: string) => void;
   onGenerate: () => void;
 }
 
 export default function StoryForm({
-  apiKey,
+  anthropicKey,
+  elevenLabsKey,
   storyTitle,
   characters,
   loading,
-  onApiKeyChange,
+  onAnthropicKeyChange,
+  onElevenLabsKeyChange,
   onTitleChange,
   onCharactersChange,
   onGenerate,
 }: Props) {
-  const [showKey, setShowKey] = useState(false);
-  const canGenerate = apiKey.trim() && storyTitle.trim() && characters.trim() && !loading;
+  const [showAnthropic, setShowAnthropic] = useState(false);
+  const [showEleven, setShowEleven] = useState(false);
+  const canGenerate =
+    anthropicKey.trim() && elevenLabsKey.trim() && storyTitle.trim() && characters.trim() && !loading;
 
   return (
     <div className="card form-card">
       <h2>✨ Story Details</h2>
-
       <div className="form-grid">
         <div className="field">
           <label>Anthropic API Key</label>
           <div className="api-key-row">
             <input
-              type={showKey ? 'text' : 'password'}
-              value={apiKey}
-              onChange={(e) => onApiKeyChange(e.target.value)}
+              type={showAnthropic ? 'text' : 'password'}
+              value={anthropicKey}
+              onChange={(e) => onAnthropicKeyChange(e.target.value)}
               placeholder="sk-ant-api03-..."
               spellCheck={false}
             />
-            <button
-              className="api-key-toggle"
-              onClick={() => setShowKey((v) => !v)}
-              type="button"
-            >
-              {showKey ? 'Hide' : 'Show'}
+            <button className="api-key-toggle" onClick={() => setShowAnthropic((v) => !v)} type="button">
+              {showAnthropic ? 'Hide' : 'Show'}
             </button>
           </div>
-          <span className="field-hint">Stored in session only — never persisted to disk</span>
+        </div>
+
+        <div className="field">
+          <label>ElevenLabs API Key</label>
+          <div className="api-key-row">
+            <input
+              type={showEleven ? 'text' : 'password'}
+              value={elevenLabsKey}
+              onChange={(e) => onElevenLabsKeyChange(e.target.value)}
+              placeholder="your-elevenlabs-key"
+              spellCheck={false}
+            />
+            <button className="api-key-toggle" onClick={() => setShowEleven((v) => !v)} type="button">
+              {showEleven ? 'Hide' : 'Show'}
+            </button>
+          </div>
+          <span className="field-hint">Keys stored in session only — never saved to disk</span>
         </div>
 
         <div className="field">
@@ -70,15 +87,11 @@ export default function StoryForm({
             placeholder="e.g. Pip the little dragon, Luna the moonbeam fairy, and a friendly cloud named Fluffy"
             disabled={loading}
           />
-          <span className="field-hint">Describe your characters — Claude will weave them into every section</span>
+          <span className="field-hint">Claude weaves them through all 6 scenes</span>
         </div>
 
-        <button
-          className="generate-btn"
-          onClick={onGenerate}
-          disabled={!canGenerate}
-        >
-          {loading ? '🌙 Generating your package...' : '🚀 Generate Complete Video Package'}
+        <button className="generate-btn" onClick={onGenerate} disabled={!canGenerate}>
+          {loading ? '🌙 Generating...' : '🚀 Generate Story + Auto Voiceover'}
         </button>
       </div>
     </div>
