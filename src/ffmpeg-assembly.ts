@@ -5,6 +5,13 @@ let ffmpeg: FFmpeg | null = null;
 
 async function getFFmpeg(onLog?: (msg: string) => void): Promise<FFmpeg> {
   if (ffmpeg && ffmpeg.loaded) return ffmpeg;
+
+  if (!self.crossOriginIsolated) {
+    throw new Error(
+      'SharedArrayBuffer is not available. Please reload the page — the service worker needs one extra load to activate.',
+    );
+  }
+
   ffmpeg = new FFmpeg();
   if (onLog) ffmpeg.on('log', ({ message }) => onLog(message));
 
