@@ -10,6 +10,8 @@ function buildPrompt(title: string, characters: string): string {
 Title: "${title}"
 Characters: ${characters}
 
+IMPORTANT: Every klingPrompt must be UNDER 280 characters (count carefully). Keep them concise but vivid.
+
 Return ONLY this exact JSON structure (6 scenes, soft calming tone, simple vocabulary):
 
 {
@@ -17,37 +19,37 @@ Return ONLY this exact JSON structure (6 scenes, soft calming tone, simple vocab
     {
       "sceneNumber": 1,
       "narration": "Warm soothing narration, 60-70 words, gentle imagery. Simple vocabulary for ages 1-3.",
-      "klingPrompt": "Soft watercolor animation style, Studio Ghibli-inspired pastel palette. [Scene: describe cozy magical environment]. [Characters: cute rounded toddler-friendly designs, happy calm expressions]. Gentle slow camera pan, soft bokeh, floating sparkles, warm golden light, dreamy peaceful atmosphere.",
+      "klingPrompt": "Watercolor animation, pastel colors, toddler-friendly. [Scene: describe setting in ~10 words]. [Characters: cute rounded designs, calm expressions]. Slow gentle camera pan, soft bokeh, warm light. Under 280 chars total.",
       "estimatedSeconds": 50
     },
     {
       "sceneNumber": 2,
       "narration": "Continue with gentle wonder, 60-70 words...",
-      "klingPrompt": "Watercolor animation. [Scene: ...]. Slow parallax movement, soft pastel colors, magical sparkles.",
+      "klingPrompt": "Watercolor animation, pastel colors. [Scene: ...]. [Characters: ...]. Gentle drift, soft sparkles. Under 280 chars.",
       "estimatedSeconds": 50
     },
     {
       "sceneNumber": 3,
       "narration": "60-70 words, growing sleepy tone...",
-      "klingPrompt": "Watercolor animation. [Scene: ...]. Very gentle camera drift.",
+      "klingPrompt": "Watercolor animation, soft pastels. [Scene: ...]. [Characters: ...]. Very gentle drift, warm glow. Under 280 chars.",
       "estimatedSeconds": 50
     },
     {
       "sceneNumber": 4,
       "narration": "50-60 words, slower pacing, softer tone...",
-      "klingPrompt": "Watercolor animation. [Scene: twilight setting, characters winding down]. Soft moonlight.",
+      "klingPrompt": "Watercolor animation, twilight pastels. [Scene: describe winding-down setting]. [Characters: sleepy expressions]. Soft moonlight, slow zoom. Under 280 chars.",
       "estimatedSeconds": 45
     },
     {
       "sceneNumber": 5,
       "narration": "40-50 words, very sleepy, whispery tone...",
-      "klingPrompt": "Watercolor animation. [Scene: cozy nighttime, characters nearly asleep]. Deep navy and warm amber palette.",
+      "klingPrompt": "Watercolor animation, deep navy and amber. [Scene: cozy nighttime, characters nearly asleep]. Soft candlelight, slow drift. Under 280 chars.",
       "estimatedSeconds": 40
     },
     {
       "sceneNumber": 6,
       "narration": "30-40 words, tender closing, invite child to sleep alongside characters...",
-      "klingPrompt": "Watercolor animation. Moonlit bedroom, character asleep under warm blanket, stars twinkling, candle glow, ultra peaceful. Extremely slow zoom out. Deep navy, soft gold, lavender.",
+      "klingPrompt": "Watercolor animation, deep navy and gold. Moonlit bedroom, character asleep under blanket, stars twinkling, candle glow. Extremely slow zoom out, ultra peaceful. Under 280 chars.",
       "estimatedSeconds": 30
     }
   ],
